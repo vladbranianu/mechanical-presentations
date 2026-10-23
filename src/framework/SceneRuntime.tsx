@@ -6,7 +6,7 @@ import { useEffect, useRef, type MutableRefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { CameraView, PresentationInstance, PresentationModule } from './types';
+import type { CameraView, PresentationInstance, PresentationModule, Quality } from './types';
 
 /** Viewer state the frame loop reads without causing React renders. */
 export interface LiveState<P> {
@@ -36,6 +36,7 @@ interface Props<P> {
   cameraApi: MutableRefObject<CameraApi | null>;
   onReady: (inst: PresentationInstance<P> | null) => void;
   onPick: (partId: string) => void;
+  quality: Quality;
 }
 
 const NARROW_ASPECT = 0.85;
@@ -52,8 +53,10 @@ interface Tween {
   start: number;
 }
 
-export function SceneRuntime<P>({ module, live, overlays, cameraApi, onReady, onPick }: Props<P>) {
+export function SceneRuntime<P>({ module, live, overlays, cameraApi, onReady, onPick, quality }: Props<P>) {
   const { gl, scene, camera, size } = useThree();
+  const setDpr = useThree((s) => s.setDpr);
+  const perf = useRef({ t: 0, n: 0 });
   const cam = camera as THREE.PerspectiveCamera;
   const inst = useRef<PresentationInstance<P> | null>(null);
   const controls = useRef<OrbitControls | null>(null);
@@ -114,10 +117,16 @@ export function SceneRuntime<P>({ module, live, overlays, cameraApi, onReady, on
         tween.current = { s0, s1, dth, t0: c.target.clone(), t1: t, start: performance.now() };
       },
     };
+    // ?debug exposes the camera for scripted screenshots
+    if (new URLSearchParams(location.search).has('debug'))
+      Object.assign(window, {
+        __mpSetView: (v: CameraView) => cameraApi.current?.setView(v, { instant: true }),
+        __mpInfo: () => ({ ...gl.info.render, dpr: gl.getPixelRatio() }),
+      });
     return () => {
       cameraApi.current = null;
     };
-  }, [cam, cameraApi, live]);
+  }, [cam, cameraApi, live, gl]);
 
   // Click picking (ignores drags).
   useEffect(() => {
@@ -160,7 +169,7 @@ export function SceneRuntime<P>({ module, live, overlays, cameraApi, onReady, on
 
   // Build / dispose the presentation (after controls + camera API exist).
   useEffect(() => {
-    const i = module.build({ gl, scene, reducedMotion: live.current.reducedMotion });
+    const i = module.build({ gl, scene, reducedMotion: live.current.reducedMotion, quality });
     scene.add(i.root);
     i.setMode(live.current.mode || i.defaultMode);
     inst.current = i;
@@ -172,7 +181,7 @@ export function SceneRuntime<P>({ module, live, overlays, cameraApi, onReady, on
       inst.current = null;
       onReady(null);
     };
-  }, [module, gl, scene]);
+  }, [module, gl, scene, quality]);
 
   const proj = useRef(new THREE.Vector3());
   const anchor = useRef(new THREE.Vector3());
@@ -183,6 +192,20 @@ export function SceneRuntime<P>({ module, live, overlays, cameraApi, onReady, on
     if (!i || !c) return;
     const L = live.current;
     const dt = Math.min(0.05, delta);
+
+    // Adaptive resolution: if the last 2 s averaged under 30 fps, drop the pixel ratio a step.
+    // (A long gap means the tab was hidden or the page stalled: start the window over.)
+    const pf = perf.current;
+    if (delta > 0.25) pf.t = pf.n = 0;
+    else {
+      pf.t += delta;
+      pf.n++;
+    }
+    if (pf.t > 2) {
+      const dpr = gl.getPixelRatio();
+      if (pf.n / pf.t < 30 && dpr > 1) setDpr(Math.max(1, dpr - 0.5));
+      pf.t = pf.n = 0;
+    }
     i.update({ dt, playing: L.playing, explode: L.explode, params: L.params });
 
     const tw = tween.current;
