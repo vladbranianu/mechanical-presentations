@@ -1,0 +1,238 @@
+/*
+ * Lives inside the R3F <Canvas>: builds the presentation, drives its frame update, the orbit
+ * camera (with tweened fly-to), click picking and the screen-space overlays.
+ */
+import { useEffect, useRef, type MutableRefObject } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import type { CameraView, PresentationInstance, PresentationModule } from './types';
+
+/** Viewer state the frame loop reads without causing React renders. */
+export interface LiveState<P> {
+  params: P;
+  explode: number;
+  playing: boolean;
+  mode: string;
+  selected: string | null;
+  labels: boolean;
+  reducedMotion: boolean;
+}
+
+export interface CameraApi {
+  setView(view: CameraView, opts?: { instant?: boolean; home?: boolean }): void;
+}
+
+/** DOM elements positioned every frame (hotspot per part id, tag per tag id). */
+export interface OverlayRefs {
+  hotspots: Record<string, HTMLElement | null>;
+  tags: Record<string, HTMLElement | null>;
+}
+
+interface Props<P> {
+  module: PresentationModule<P>;
+  live: MutableRefObject<LiveState<P>>;
+  overlays: MutableRefObject<OverlayRefs>;
+  cameraApi: MutableRefObject<CameraApi | null>;
+  onReady: (inst: PresentationInstance<P> | null) => void;
+  onPick: (partId: string) => void;
+}
+
+const NARROW_ASPECT = 0.85;
+const TWEEN_MS = 1600;
+const IDLE_ROTATE_S = 8;
+const ease = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+
+interface Tween {
+  s0: THREE.Spherical;
+  s1: THREE.Spherical;
+  dth: number;
+  t0: THREE.Vector3;
+  t1: THREE.Vector3;
+  start: number;
+}
+
+export function SceneRuntime<P>({ module, live, overlays, cameraApi, onReady, onPick }: Props<P>) {
+  const { gl, scene, camera, size } = useThree();
+  const cam = camera as THREE.PerspectiveCamera;
+  const inst = useRef<PresentationInstance<P> | null>(null);
+  const controls = useRef<OrbitControls | null>(null);
+  const tween = useRef<Tween | null>(null);
+  const idle = useRef(0);
+  const narrow = size.width / size.height < NARROW_ASPECT;
+
+  // Orbit controls.
+  useEffect(() => {
+    const c = new OrbitControls(cam, gl.domElement);
+    c.enableDamping = true;
+    c.dampingFactor = 0.08;
+    c.minDistance = module.scene.minDistance;
+    c.maxDistance = module.scene.maxDistance;
+    c.autoRotateSpeed = 0.35;
+    controls.current = c;
+    return () => {
+      c.dispose();
+      controls.current = null;
+    };
+  }, [cam, gl, module]);
+
+  // Portrait screens get a wider lens.
+  useEffect(() => {
+    cam.fov = narrow ? (module.scene.narrowFov ?? module.scene.fov) : module.scene.fov;
+    cam.updateProjectionMatrix();
+  }, [cam, narrow, module]);
+
+  // Camera fly-to.
+  useEffect(() => {
+    const narrowNow = () => cam.aspect < NARROW_ASPECT;
+    cameraApi.current = {
+      setView(v, opts = {}) {
+        const c = controls.current;
+        if (!c) return;
+        const t = new THREE.Vector3(...v.target);
+        const p = new THREE.Vector3(...v.position)
+          .sub(t)
+          .multiplyScalar(narrowNow() ? 1.45 : 1)
+          .add(t);
+        // On portrait screens the bottom sheet / HUD cover the lower part: lift the overview.
+        if (opts.home && narrowNow()) {
+          t.y -= 9;
+          p.y -= 9;
+        }
+        if (opts.instant || live.current.reducedMotion) {
+          c.target.copy(t);
+          cam.position.copy(p);
+          c.update();
+          tween.current = null;
+          return;
+        }
+        const s0 = new THREE.Spherical().setFromVector3(cam.position.clone().sub(c.target));
+        const s1 = new THREE.Spherical().setFromVector3(p.clone().sub(t));
+        let dth = s1.theta - s0.theta;
+        while (dth > Math.PI) dth -= 2 * Math.PI;
+        while (dth < -Math.PI) dth += 2 * Math.PI;
+        tween.current = { s0, s1, dth, t0: c.target.clone(), t1: t, start: performance.now() };
+      },
+    };
+    return () => {
+      cameraApi.current = null;
+    };
+  }, [cam, cameraApi, live]);
+
+  // Click picking (ignores drags).
+  useEffect(() => {
+    const el = gl.domElement;
+    const ray = new THREE.Raycaster(),
+      ndc = new THREE.Vector2();
+    let down: [number, number] | null = null;
+    const onDown = (e: PointerEvent) => {
+      down = [e.clientX, e.clientY];
+      tween.current = null;
+      idle.current = 0;
+    };
+    const onUp = (e: PointerEvent) => {
+      const d = down;
+      down = null;
+      const i = inst.current;
+      if (!d || !i || Math.hypot(e.clientX - d[0], e.clientY - d[1]) > 5) return;
+      const r = el.getBoundingClientRect();
+      ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, cam);
+      const mode = live.current.mode;
+      const hit = ray
+        .intersectObjects(i.pickables, false)
+        .find((h) => h.object.userData.part && (!i.acceptHit || i.acceptHit(h, mode)));
+      if (hit) onPick(hit.object.userData.part);
+    };
+    const onWheel = () => {
+      tween.current = null;
+      idle.current = 0;
+    };
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('wheel', onWheel, { passive: true });
+    return () => {
+      el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('wheel', onWheel);
+    };
+  }, [gl, cam, live, onPick]);
+
+  // Build / dispose the presentation (after controls + camera API exist).
+  useEffect(() => {
+    const i = module.build({ gl, scene, reducedMotion: live.current.reducedMotion });
+    scene.add(i.root);
+    i.setMode(live.current.mode || i.defaultMode);
+    inst.current = i;
+    onReady(i);
+    cameraApi.current?.setView(i.homeView, { instant: true, home: true });
+    return () => {
+      scene.remove(i.root);
+      i.dispose();
+      inst.current = null;
+      onReady(null);
+    };
+  }, [module, gl, scene]);
+
+  const proj = useRef(new THREE.Vector3());
+  const anchor = useRef(new THREE.Vector3());
+
+  useFrame((state, delta) => {
+    const i = inst.current,
+      c = controls.current;
+    if (!i || !c) return;
+    const L = live.current;
+    const dt = Math.min(0.05, delta);
+    i.update({ dt, playing: L.playing, explode: L.explode, params: L.params });
+
+    const tw = tween.current;
+    if (tw) {
+      const k = Math.min(1, (performance.now() - tw.start) / TWEEN_MS),
+        e = ease(k);
+      // a small outward arc so the camera doesn't clip through the model
+      const r = tw.s0.radius + (tw.s1.radius - tw.s0.radius) * e + Math.sin(Math.PI * e) * 8;
+      const sp = new THREE.Spherical(r, tw.s0.phi + (tw.s1.phi - tw.s0.phi) * e, tw.s0.theta + tw.dth * e);
+      c.target.lerpVectors(tw.t0, tw.t1, e);
+      cam.position.setFromSpherical(sp).add(c.target);
+      cam.lookAt(c.target);
+      if (k >= 1) {
+        tween.current = null;
+        c.update();
+      }
+    } else {
+      idle.current += dt;
+      c.autoRotate = !L.reducedMotion && !L.selected && idle.current > IDLE_ROTATE_S;
+      c.update();
+    }
+
+    // overlays
+    if (!L.labels) return;
+    const w = state.size.width,
+      h = state.size.height;
+    const project = (v: THREE.Vector3) => {
+      const t = proj.current.copy(v).project(cam);
+      return {
+        x: ((t.x + 1) / 2) * w,
+        y: ((1 - t.y) / 2) * h,
+        ok: t.z < 1 && Math.abs(t.x) < 1.1 && Math.abs(t.y) < 1.1,
+      };
+    };
+    for (const part of i.parts) {
+      const el = overlays.current.hotspots[part.id];
+      if (!el) continue;
+      const q = project(part.anchor(anchor.current));
+      el.classList.toggle('off', !q.ok);
+      el.style.transform = `translate(${q.x - 15}px,${q.y - 15}px)`;
+    }
+    for (const tag of i.tags ?? []) {
+      const el = overlays.current.tags[tag.id];
+      if (!el) continue;
+      const q = project(tag.position(anchor.current));
+      el.style.transform = `translate(${q.x - 7}px,${q.y - 8}px)`;
+      el.hidden = !q.ok || !!L.selected;
+      el.classList.toggle('active', !!tag.active?.());
+    }
+  });
+
+  return null;
+}
