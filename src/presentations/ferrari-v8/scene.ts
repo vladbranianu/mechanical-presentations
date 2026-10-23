@@ -225,7 +225,7 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
   key.position.set(-30, 70, 45);
   key.castShadow = true;
   key.shadow.mapSize.set(low ? 1024 : 2048, low ? 1024 : 2048);
-  Object.assign(key.shadow.camera, { left: -62, right: 62, top: 62, bottom: -62, near: 10, far: 200 });
+  Object.assign(key.shadow.camera, { left: -75, right: 75, top: 75, bottom: -75, near: 10, far: 220 });
   key.shadow.bias = -0.0004;
   key.shadow.normalBias = 0.04;
   root.add(key);
@@ -251,6 +251,14 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
     new THREE.Plane(V3(1, 0, 0), -XR),
   ]);
   const housing = sv.housing.bind(sv);
+  // gearbox: its own cut, the upper +z quarter of the bellhousing, to show the clutch pack
+  const svBox = new SectionView([
+    new THREE.Plane(V3(0, 0, -1), 0),
+    new THREE.Plane(V3(0, -1, 0), -1),
+    new THREE.Plane(V3(1, 0, 0), -33.5),
+    new THREE.Plane(V3(-1, 0, 0), 22),
+  ]);
+  const inBoxCut = (p: THREE.Vector3) => p.z > 0 && p.y > -1 && p.x < 33.5 && p.x > 22;
   const inCut = (p: THREE.Vector3) => p.y < p.z && p.z > 0 && p.x > -XF && p.x < XR;
 
   /* ---------- Materials ---------- */
@@ -274,6 +282,26 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
     plenum: st(std({ color: 0x3a3f44, metalness: 0.6, roughness: 0.42, bumpMap: castBump, bumpScale: 0.008 })),
     carbon: st(
       phys({ color: 0xffffff, map: carbonTex(), metalness: 0.25, roughness: 0.42, clearcoat: 1, clearcoatRoughness: 0.08 }),
+    ),
+    letters: st(
+      std({
+        color: 0xf2f2f0,
+        metalness: 0.55,
+        roughness: 0.22,
+        alphaMap: canvasTex(1024, 72, (x, w, h) => {
+          x.fillStyle = '#000';
+          x.fillRect(0, 0, w, h);
+          x.fillStyle = '#fff';
+          x.font = 'italic 700 62px Arial, Helvetica, sans-serif';
+          x.textAlign = 'center';
+          x.textBaseline = 'middle';
+          (x as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = '28px';
+          x.fillText('FERRARI', w / 2, h / 2 + 2);
+        }),
+        alphaTest: 0.5,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+      }),
     ),
     sump: st(std({ color: 0x6a7176, metalness: 0.6, roughness: 0.5, bumpMap: castBump, bumpScale: 0.01 })),
     machined: st(std({ color: 0xcfd3d6, metalness: 0.85, roughness: 0.28 })),
@@ -322,6 +350,7 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
     intercooler: [M.core, M.silicone],
     intake: [MS.plenum, MS.carbon],
     sump: [MS.sump],
+    gearbox: [] as THREE.MeshStandardMaterial[],
     belt: [M.belt, M.pulley, M.acc],
   };
 
@@ -516,6 +545,81 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
     mk.castShadow = false;
   }
   reg('fly', flyG);
+
+
+  /* ---------- 7-speed dual-clutch transaxle (Getrag 7DCL750 on the 488) ---------- */
+  const boxG = new THREE.Group();
+  root.add(boxG);
+  {
+    const gb = <M extends THREE.Material>(m: M) => {
+      m.clipIntersection = true;
+      svBox.material(m);
+      return m;
+    };
+    const case1 = gb(std({ color: 0x6d7479, metalness: 0.55, roughness: 0.55, bumpMap: castBump, bumpScale: 0.012 }));
+    const case2 = gb(std({ color: 0x4f565b, metalness: 0.55, roughness: 0.6, bumpMap: castBump, bumpScale: 0.012 }));
+    PART_MATS.gearbox.push(case1, case2);
+    const hb = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number, cut = true) => {
+      const m = mesh(boxG, geo, mat, x, y, z);
+      if (cut) svBox.addBack(boxG, m);
+      return m;
+    };
+    // bellhousing: turned profile along x, open towards the engine
+    const prof = [
+      [12.9, 0],
+      [13.1, 0.6],
+      [12.8, 1.2],
+      [12.4, 4],
+      [11.6, 7],
+      [10.6, 9.6],
+      [10.2, 10.4],
+    ].map(([r, h]) => new THREE.Vector2(r, h));
+    hb(new THREE.LatheGeometry(prof, seg(56)).rotateZ(-PI / 2), case1, 22.8, 0, 0);
+    hb(cylX(10.4, 0.5, seg(56)), case1, 33.3, 0, 0);
+    // flange bolts to the block
+    const fb: BoltSpec[] = [];
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * PI * 2;
+      fb.push([23.6, 12.6 * Math.cos(a), 12.6 * Math.sin(a), 'x', 1]);
+    }
+    bolts(boxG, fb, MS.bolt);
+    // main case, differential bulge, rear cover
+    hb(rbox(19, 15, 16, 3, 0.8), case1, 43, -1.5, 0);
+    hb(cylZ(6.2, 21, seg(40)), case1, 36.6, -4.4, 0);
+    hb(rbox(1.6, 14, 15, 2.6, 0.5), case2, 53.2, -1.5, 0);
+    for (let i = 0; i < 6; i++) hb(new THREE.BoxGeometry(0.5, 13, 16.6), case2, 36 + i * 3.2, -1.5, 0, false);
+    const rb: BoltSpec[] = [];
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * PI * 2;
+      rb.push([54.1, -1.5 + 6 * Math.cos(a), 6.6 * Math.sin(a), 'x', 1]);
+    }
+    bolts(boxG, rb, MS.bolt);
+    // hydraulic shift / clutch control unit on top, oil cooler + lines
+    hb(rbox(9, 3.4, 7, 1, 0.4), MS.black, 45, 7.4, -1, false);
+    mesh(boxG, rbox(4, 2.2, 3, 0.6, 0.3), M.coil, 49, 9.6, -2.5);
+    tube(boxG, [[49, 9.6, -1], [51, 10.4, 2], [48, 9, 4.6]], 0.3, MS.rubber, seg(16));
+    mesh(boxG, new THREE.BoxGeometry(7, 5, 1.6), M.core, 45, 2, -9.8);
+    tube(boxG, [[41.5, 3, -9.2], [39, 5, -8], [38.5, 5.2, -7.6]], 0.3, MS.machined, 12);
+    tube(boxG, [[48.5, 1, -9.2], [50.5, 3, -8], [51, 3.4, -7.6]], 0.3, MS.machined, 12);
+    // drive shafts with CV boots
+    [1, -1].forEach((s) => {
+      mesh(boxG, cylZ(2.2, 1.6, seg(32)), MS.machined, 36.6, -4.4, s * 11.3);
+      const boot = mesh(boxG, new THREE.CylinderGeometry(1.0, 2.0, 4, seg(24)).rotateX(PI / 2), MS.rubber, 36.6, -4.4, s * 14);
+      boot.rotation.y = s > 0 ? 0 : PI;
+      mesh(boxG, cylZ(0.8, 9, seg(16)), MS.machined, 36.6, -4.4, s * 20.4);
+    });
+    // dual clutch pack inside the bellhousing (turns with the crank)
+    const cl = std({ color: 0x9ba2a7, metalness: 0.85, roughness: 0.3 });
+    mesh(flyG, cylX(9.0, 2.6, seg(56)), cl, 27.4, 0, 0);
+    mesh(flyG, cylX(6.6, 2.0, seg(48)), M.fly, 30.0, 0, 0);
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * PI * 2,
+        f = mesh(flyG, new THREE.BoxGeometry(2.4, 0.5, 0.3), M.coil, 27.4, 9.05 * Math.cos(a), 9.05 * Math.sin(a));
+      f.rotation.x = a;
+    }
+    mesh(flyG, cylX(2.2, 3, seg(24)), MS.machined, 32, 0, 0); // input shafts
+  }
+  reg('gearbox', boxG);
 
   /* ---------- Per-cylinder parts ---------- */
   const UP = V3(0, 1, 0);
@@ -719,6 +823,12 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
       housing(bankG[s], rbox(w - 5, 1.1, 0.8, 0.4, 0.2), MS.red, xm, y, DECK + 11.15, false),
     );
     housing(bankG[s], rbox(w - 4, 4.4, 0.4, 0.8, 0.15), MS.wrinkle, xm, 0, DECK + 11.05, false);
+    // cast lettering on the outer flank of the cover
+    {
+      const lt = mesh(bankG[s], new THREE.PlaneGeometry(16, 1.15), MS.letters, xm - 2, -I * 4.55, DECK + 11.1);
+      lt.castShadow = false;
+      if (s > 0) lt.rotation.z = PI; // read the right way round from outside the V
+    }
     const bl1: BoltSpec[] = [];
     for (let i = 0; i < 9; i++) {
       const x = x0 + 1.8 + (i * (w - 3.6)) / 8;
@@ -773,9 +883,9 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
     tube(
       bankG[s],
       [
-        [x0 + 0.5, -I * 4.4, DECK + 11.6],
-        [xm, -I * 4.5, DECK + 11.75],
-        [x1 - 1.5, -I * 4.4, DECK + 11.6],
+        [x0 + 0.5, -I * 2.75, DECK + 11.5],
+        [xm, -I * 2.8, DECK + 11.6],
+        [x1 - 1.5, -I * 2.75, DECK + 11.5],
       ],
       0.28,
       MS.rubber,
@@ -785,8 +895,8 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
       tube(
         bankG[s],
         [
-          [c.x + 0.6, -I * 4.4, DECK + 11.7],
-          [c.x + 0.3, -I * 3.2, DECK + 12.2],
+          [c.x + 0.8, -I * 2.75, DECK + 11.6],
+          [c.x + 0.4, -I * 2.4, DECK + 12.0],
           [c.x, -I * 2.0, DECK + 11.8],
         ],
         0.16,
@@ -932,14 +1042,16 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
     mesh(g, rbox(7.6, 0.4, 5.4, 1.2, 0.15), M.shield, 31.5, TY + 0.4, s * (TZ - 2));
     // O2 sensors
     mesh(g, cylY(0.35, 1.8, 10), MS.machined, 26, TY + 0.8, s * (TZ - 1));
-    tube(g, [[35, TY - 2.2, s * (TZ - 2)], [38, TY - 3, s * (TZ - 6)], [40, TY - 3.5, s * 12]], 1.1, M.cat, seg(20));
+    tube(g, [[35, TY - 2.2, s * (TZ - 2)], [44, -1.5, s * 20], [52, 1, s * 14], [56, 2, s * 9]], 1.1, M.cat, seg(30));
   });
   {
-    const muf = mesh(exhaustG[1], rbox(6, 6, 26, 2.5, 0.9), M.cat, 41, -4, 0);
+    // rear silencer sits behind the gearbox, with bypass valves and twin tips
+    const muf = mesh(exhaustG[1], rbox(6.4, 7, 24, 2.6, 0.9), M.cat, 59, 2, 0);
     reg('exhaust', muf);
     [1, -1].forEach((s) => {
-      mesh(exhaustG[1], cylX(1.5, 4, seg(28)), MS.machined, 45.5, -4.6, s * 7);
-      mesh(exhaustG[1], new THREE.CylinderGeometry(1.5, 1.5, 0.3, seg(28), 1, true).rotateZ(PI / 2), std({ color: 0x111111, side: THREE.DoubleSide }), 47.6, -4.6, s * 7);
+      mesh(exhaustG[1], cylX(1.7, 4.4, seg(28)), MS.machined, 64, 1.6, s * 6.5);
+      mesh(exhaustG[1], new THREE.CylinderGeometry(1.7, 1.7, 0.3, seg(28), 1, true).rotateZ(PI / 2), std({ color: 0x111111, side: THREE.DoubleSide }), 66.3, 1.6, s * 6.5);
+      mesh(exhaustG[1], cylZ(0.9, 1.6, 16), M.boost, 58, 6.2, s * 8); // bypass valve actuator
     });
   }
   BANKS.forEach((s) => {
@@ -1072,6 +1184,21 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
     mesh(caseG, cylY(0.9, 0.9, 20), M.yellow, -33, 10.4, -12);
     hose(caseG, [[-31, 6.5, -11], [-30, 9, -6], [BELT_X + 4, PUL.wp.y - 1.5, -1.5]], 0.5);
   }
+  // crankcase breathers: cam covers → intake
+  BANKS.forEach((s) => {
+    const I = IN[s];
+    tube(
+      caseG,
+      [bp(s, 13, I * 4.6, DECK + 11.3), bp(s, 15.5, I * 6.5, DECK + 13), [17, 28.6, s * 4.4], [16.6, 27.9, s * 2.6]],
+      0.42,
+      MS.rubber,
+      seg(24),
+    );
+  });
+  // coolant crossover at the rear of the V + thermostat housing
+  mesh(caseG, cylX(1.3, 3, seg(20)), MS.cast, 22.6, 20, 0);
+  hose(caseG, [[22.6, 20, 1.3], [22.8, 19.6, 6], bp(1, 21.4, 4, DECK + 1.5)], 0.6);
+  hose(caseG, [[22.6, 20, -1.3], [22.8, 19.6, -6], bp(-1, 21.4, -4, DECK + 1.5)], 0.6);
   // engine harness along the valley
   tube(caseG, [[-22, 20.6, 2.4], [-8, 21.6, 2.6], [8, 21.6, 2.6], [20, 20.6, 2.4], [24, 16, 4]], 0.45, MS.rubber, seg(40));
   tube(caseG, [[-22, 20.6, -2.4], [-8, 21.6, -2.6], [8, 21.6, -2.6], [20, 20.6, -2.4]], 0.45, MS.rubber, seg(40));
@@ -1118,7 +1245,7 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
 
   // collapse static geometry into one mesh per material and part (≈ a third of the draw calls)
   const moving = (o: THREE.Object3D) => !!(o.userData.moving || o.userData.aid);
-  [caseG, sumpG, intakeG, flyG, frontG, cranks.flat, cranks.cross, ...BANKS.flatMap((s) => [bankG[s], blockG[s], exhaustG[s], coolerG[s]])].forEach(
+  [caseG, sumpG, intakeG, flyG, frontG, boxG, cranks.flat, cranks.cross, ...BANKS.flatMap((s) => [bankG[s], blockG[s], exhaustG[s], coolerG[s]])].forEach(
     (g) => mergeStatic(g, pickables, moving),
   );
   // ...and inside each moving sub-assembly
@@ -1181,6 +1308,7 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
     intakeG.position.y = ex * 14;
     sumpG.position.y = -ex * 6;
     flyG.position.x = ex * 8;
+    boxG.position.x = ex * 20;
     frontG.position.x = -ex * 8;
     let fire: CylState | null = null;
     for (const c of cyl) {
@@ -1253,7 +1381,10 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
       { id: 'xray', label: 'X-ray', revealsInternals: true },
     ],
     defaultMode: 'cut',
-    setMode: (id) => sv.apply(id as SectionMode),
+    setMode: (id) => {
+      sv.apply(id as SectionMode);
+      svBox.apply(id as SectionMode);
+    },
     highlight(k) {
       Object.entries(PART_MATS).forEach(([p, ms]) => ms.forEach((m) => m.emissive.setHex(p === k ? 0x110c04 : 0x000000)));
       aidsOn = k === 'crank';
@@ -1262,7 +1393,7 @@ export function buildFerrariV8({ gl, scene, quality = 'high' }: BuildContext): F
       if (!visibleChain(h.object)) return false;
       if (mode !== 'cut') return true;
       const clipped = !!((h.object as THREE.Mesh).material as THREE.Material).clippingPlanes;
-      return !(clipped && inCut(h.point));
+      return !(clipped && (inCut(h.point) || inBoxCut(h.point)));
     },
     tags: cyl.map((c) => ({
       id: String(c.n),

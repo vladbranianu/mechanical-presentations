@@ -7,7 +7,7 @@ const pv = (t: Vec3, p: Vec3, k = 1.9): CameraView => ({
   position: [t[0] + (p[0] - t[0]) * k, t[1] + (p[1] - t[1]) * k, t[2] + (p[2] - t[2]) * k],
 });
 
-export const HOME_VIEW: CameraView = { target: [-3, 5, 1], position: [-63, 45, 89] };
+export const HOME_VIEW: CameraView = { target: [6, 4, 2], position: [-62, 50, 104] };
 
 const STROKE_M = 0.083,
   R_M = 0.0415;
@@ -217,17 +217,33 @@ export function makeParts(sim: FerrariV8Sim): PartInfo[] {
     },
     {
       id: 'fly',
+      internal: true,
       group: 'Transmisie',
-      name: 'Volantă',
-      lead: 'Netezește impulsurile de cuplu și transmite rotația spre cutia de viteze.',
-      body: 'Cu patru aprinderi pe rotație, impulsurile se suprapun mult, așa că volanta poate fi ușoară, ceea ce ajută motorul să urce rapid în turație. În spatele ei, pe 488 GTB, vine o cutie cu dublu ambreiaj cu 7 trepte.',
+      name: 'Volantă și ambreiaje',
+      lead: 'Netezește impulsurile de cuplu și transmite rotația spre pachetul de ambreiaje.',
+      body: 'Cu patru aprinderi pe rotație, impulsurile se suprapun mult, așa că volanta poate fi ușoară, ceea ce ajută motorul să urce rapid în turație. Lângă ea, în clopotul cutiei, stă pachetul celor două ambreiaje (secționat în modul Secțiune).',
       specs: [
         ['Aprinderi pe rotație', '4'],
         ['Turație maximă', '8000 rpm'],
         ['Turație', live.rpm],
       ],
-      view: pv([25, 0, 0], [54, 12, 26]),
-      anchor: (o) => o.set(24.9 + ex() * 8, 9.6, 0),
+      view: { target: [27, 3, 5], position: [37, 1, 50] },
+      anchor: (o) => o.set(27.4 + ex() * 8, 6.4, 6.4),
+    },
+    {
+      id: 'gearbox',
+      group: 'Transmisie',
+      name: 'Cutie cu dublu ambreiaj',
+      lead: 'Cutie cu 7 trepte și două ambreiaje umede, legată direct în spatele motorului.',
+      body: 'Un ambreiaj ține treptele impare, celălalt pe cele pare. În timp ce mergi într-o treaptă, următoarea e deja cuplată pe celălalt ax, iar schimbarea înseamnă doar trecerea cuplului de pe un ambreiaj pe altul, în câteva sutimi de secundă și fără întreruperea tracțiunii. Diferențialul e în aceeași carcasă, iar planetarele ies lateral spre roțile din spate.',
+      specs: [
+        ['Trepte', '7, dublu ambreiaj umed'],
+        ['Furnizor (488 GTB)', 'Getrag 7DCL750'],
+        ['Comandă', 'electro-hidraulică'],
+        ['Turație ax de intrare', live.rpm],
+      ],
+      view: { target: [42, 1, 0], position: [70, 38, 54] },
+      anchor: (o) => o.set(44 + ex() * 20, 6, 8),
     },
   ];
 }

@@ -16,7 +16,7 @@ const ferrariV8: PresentationModule<FerrariV8Params> = {
     colorManagement: false,
   },
   initialParams: { rpm: 3000, slowIdx: 1, crank: 'flat' },
-  thumbnailView: { target: [2, 4, 4], position: [-52, 40, 84] },
+  thumbnailView: { target: [8, 4, 4], position: [-52, 42, 92] },
   build: buildFerrariV8,
   Hud: FerrariV8Hud,
   Controls: FerrariV8Controls,

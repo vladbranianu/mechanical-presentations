@@ -122,11 +122,12 @@ export function SceneRuntime<P>({ module, live, overlays, cameraApi, onReady, on
       Object.assign(window, {
         __mpSetView: (v: CameraView) => cameraApi.current?.setView(v, { instant: true }),
         __mpInfo: () => ({ ...gl.info.render, dpr: gl.getPixelRatio() }),
+        __mpScene: scene,
       });
     return () => {
       cameraApi.current = null;
     };
-  }, [cam, cameraApi, live, gl]);
+  }, [cam, cameraApi, live, gl, scene]);
 
   // Click picking (ignores drags).
   useEffect(() => {
