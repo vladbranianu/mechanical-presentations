@@ -587,6 +587,9 @@ input:focus-visible {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
   }
+  .cells[data-n='4'] {
+    grid-template-columns: repeat(2, 1fr);
+  }
   .cell {
     width: auto;
     min-width: 0;

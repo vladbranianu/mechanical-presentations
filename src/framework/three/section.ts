@@ -73,5 +73,7 @@ export class SectionView {
       mat.needsUpdate = true;
     }
     for (const b of this.backs) b.visible = mode === 'cut';
+    // also on the material, so back faces merged into bigger meshes follow the mode
+    this.backMaterial.visible = mode === 'cut';
   }
 }

@@ -23,10 +23,17 @@ src/
     ui.tsx                     butoane, slidere, useTicker
     three/section.ts           moduri Secțiune / Asamblat / X-ray (planuri de tăiere + fețe roșii)
     three/geometry.ts          helperi pentru modelare procedurală (rbox, cyl*, bolts, tube, texturi)
+    three/merge.ts             unește piesele statice (mai puține draw calls, important pe telefon)
+    quality.ts                 detectează telefon / GPU slab → calitate 'low' (umbre, segmente, DPR)
   presentations/
     catalog.ts                 lista prezentărilor (metadate + import dinamic)
-    flat-six/                  prima prezentare
+    flat-six/                  boxer 3,3 L
+    ferrari-v8/                Ferrari F154 3,9 L twin-turbo, arbore flat-plane / cross-plane comutabil
 ```
+
+Calitatea: `build()` primește `quality` ('high' / 'low'); `?quality=low` în URL forțează modul
+pentru telefoane. Rezoluția scade singură un pas dacă scena merge sub 30 fps. `?debug` expune
+`window.__mpSetView` și `window.__mpInfo` pentru capturi și număr de draw calls.
 
 three.js și codul scenei se descarcă doar când deschizi o prezentare; pagina de listare
 încarcă ~85 kB gzip.

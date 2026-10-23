@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { SceneRuntime, type CameraApi, type LiveState, type OverlayRefs } from './SceneRuntime';
 import type { HudProps, PresentationInstance, PresentationMeta, PresentationModule } from './types';
 import { Btn, Range, useReducedMotion, useTicker } from './ui';
+import { detectQuality, dprRange } from './quality';
 
 interface Props<P> {
   meta: PresentationMeta;
@@ -19,6 +20,7 @@ interface Props<P> {
 
 export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
   const reducedMotion = useReducedMotion() || capture;
+  const quality = useMemo(() => (capture ? 'high' : detectQuality()), [capture]);
   const [instance, setInstance] = useState<PresentationInstance<P> | null>(null);
   const [params, setParamsState] = useState<P>(module.initialParams);
   const [mode, setMode] = useState<string>('');
@@ -114,7 +116,7 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
     () => (
       <Canvas
         shadows="percentage"
-        dpr={[1, 2]}
+        dpr={dprRange(quality)}
         legacy={sc.colorManagement === false}
         gl={{ antialias: true, preserveDrawingBuffer: capture }}
         camera={{ fov: sc.fov, near: sc.near, far: sc.far, position: [0, 0, 100] }}
@@ -137,10 +139,11 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
           cameraApi={cameraApi}
           onReady={onReady}
           onPick={onPick}
+          quality={quality}
         />
       </Canvas>
     ),
-    [module, sc, capture, onReady, onPick],
+    [module, sc, capture, quality, onReady, onPick],
   );
 
   const Hud = module.Hud,
