@@ -16,6 +16,17 @@ export const PRESENTATIONS: PresentationMeta[] = [
     tags: ['Motor', 'Cinematică', 'Distribuție'],
     load: () => import('./flat-six'),
   },
+  {
+    slug: 'turbofan',
+    title: 'Turbofan CFM56',
+    eyebrow: 'Boeing 737 · CFM56-7B · 2 arbori · bypass 5:1',
+    summary: 'Motor de avion secționat: ventilator, compresoare, cameră de ardere, turbine și aerul care trece prin ele.',
+    intro:
+      'Motorul unui Boeing 737, secționat. Mișcă maneta și urmărește cum accelerează cei doi rotori, cum se încălzește aerul și cum se deschide inversorul. Trage ca să rotești, apasă pe un punct.',
+    thumbnail: '/thumbnails/turbofan.jpg',
+    tags: ['Motor de avion', 'Turbomașini', 'Termodinamică'],
+    load: () => import('./turbofan'),
+  },
 ];
 
 export const findPresentation = (slug: string | undefined) => PRESENTATIONS.find((p) => p.slug === slug);
