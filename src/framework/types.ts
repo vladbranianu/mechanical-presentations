@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import type { SoundDef } from './audio/engineSound';
 import type { Intersection, Object3D, Scene, Vector3, WebGLRenderer } from 'three';
 
 export type Vec3 = [number, number, number];
@@ -116,6 +117,8 @@ export interface PresentationModule<P = Record<string, unknown>> {
   Hud?: ComponentType<HudProps<P>>;
   /** Presentation-specific controls in the bottom bar (before the shared ones). */
   Controls?: ComponentType<HudProps<P>>;
+  /** Procedural engine sound; the viewer adds the on/off toggle when present. */
+  sound?: SoundDef<P, any>;
 }
 
 /** Catalog entry. Kept free of three.js so the listing page stays light. */

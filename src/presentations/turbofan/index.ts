@@ -1,6 +1,7 @@
 import type { PresentationModule } from '../../framework/types';
 import { TurbofanControls, TurbofanHud } from './Hud';
-import { buildTurbofan, type TurbofanParams } from './scene';
+import { buildTurbofan, type TurbofanInstance, type TurbofanParams } from './scene';
+import { N1_RPM_100, N2_RPM_100 } from './engine';
 
 const turbofan: PresentationModule<TurbofanParams> = {
   scene: {
@@ -18,6 +19,12 @@ const turbofan: PresentationModule<TurbofanParams> = {
   build: buildTurbofan,
   Hud: TurbofanHud,
   Controls: TurbofanControls,
+  sound: {
+    kind: 'turbofan',
+    // 24 wide-chord fan blades; the whine is the first HPC stage.
+    voice: { fanBlades: 24, hpcBlades: 38, n1Rpm100: N1_RPM_100, n2Rpm100: N2_RPM_100, gain: 0.7 },
+    state: (_p, i: TurbofanInstance) => ({ n1: i.sim.eng.n1, n2: i.sim.eng.n2, reverse: i.sim.reverse }),
+  },
 };
 
 export default turbofan;
