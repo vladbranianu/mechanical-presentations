@@ -10,6 +10,7 @@ import { SceneRuntime, type CameraApi, type LiveState, type OverlayRefs } from '
 import type { HudProps, PresentationInstance, PresentationMeta, PresentationModule } from './types';
 import { Btn, Range, useReducedMotion, useTicker } from './ui';
 import { detectQuality, dprRange } from './quality';
+import { useEngineSound } from './audio/useEngineSound';
 
 interface Props<P> {
   meta: PresentationMeta;
@@ -42,6 +43,8 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
 
   const overlays = useRef<OverlayRefs>({ hotspots: {}, tags: {} });
   const cameraApi = useRef<CameraApi | null>(null);
+
+  const sound = useEngineSound(capture ? undefined : module.sound, instance, live);
 
   const setParams = useCallback((patch: Partial<P>) => setParamsState((p) => ({ ...p, ...patch })), []);
 
@@ -214,6 +217,11 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
                   <Btn pressed={!playing} onClick={() => setPlaying((p) => !p)}>
                     {playing ? 'Pauză' : 'Pornește'}
                   </Btn>
+                  {sound.available && (
+                    <Btn pressed={sound.on} onClick={sound.toggle} title="Sunet generat din turația și ordinea de aprindere">
+                      Sunet
+                    </Btn>
+                  )}
                 </div>
               </div>
               <div className="ctl wide">
