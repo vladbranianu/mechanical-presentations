@@ -58,7 +58,11 @@ export interface BuildContext {
   gl: WebGLRenderer;
   scene: Scene;
   reducedMotion: boolean;
+  /** 'low' on phones / weak GPUs: presentations may use smaller shadow maps and fewer segments. */
+  quality?: Quality;
 }
+
+export type Quality = 'high' | 'low';
 
 /** What a presentation's build() returns: a live scene plus the hooks the viewer drives. */
 export interface PresentationInstance<P> {
