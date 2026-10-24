@@ -23,6 +23,13 @@ export interface CameraApi {
   setView(view: CameraView, opts?: { instant?: boolean; home?: boolean }): void;
 }
 
+/** Screen pixels covered by UI (phone sheets); the view is centred in what is left. */
+export interface ViewInset {
+  top: number;
+  bottom: number;
+  right: number;
+}
+
 /** DOM elements positioned every frame (hotspot per part id, tag per tag id). */
 export interface OverlayRefs {
   hotspots: Record<string, HTMLElement | null>;
@@ -33,6 +40,7 @@ interface Props<P> {
   module: PresentationModule<P>;
   live: MutableRefObject<LiveState<P>>;
   overlays: MutableRefObject<OverlayRefs>;
+  viewInset: MutableRefObject<ViewInset>;
   cameraApi: MutableRefObject<CameraApi | null>;
   onReady: (inst: PresentationInstance<P> | null) => void;
   onPick: (partId: string) => void;
@@ -53,7 +61,7 @@ interface Tween {
   start: number;
 }
 
-export function SceneRuntime<P>({ module, live, overlays, cameraApi, onReady, onPick, quality }: Props<P>) {
+export function SceneRuntime<P>({ module, live, overlays, viewInset, cameraApi, onReady, onPick, quality }: Props<P>) {
   const { gl, scene, camera, size } = useThree();
   const setDpr = useThree((s) => s.setDpr);
   const perf = useRef({ t: 0, n: 0 });
@@ -62,6 +70,7 @@ export function SceneRuntime<P>({ module, live, overlays, cameraApi, onReady, on
   const controls = useRef<OrbitControls | null>(null);
   const tween = useRef<Tween | null>(null);
   const idle = useRef(0);
+  const shift = useRef({ x: 0, y: 0, ax: 0, ay: 0, w: 0, h: 0 });
   const narrow = size.width / size.height < NARROW_ASPECT;
 
   // Orbit controls.
@@ -208,6 +217,23 @@ export function SceneRuntime<P>({ module, live, overlays, cameraApi, onReady, on
       pf.t = pf.n = 0;
     }
     i.update({ dt, playing: L.playing, explode: L.explode, params: L.params });
+
+    // Shift the projection (not the orbit) so the orbit target sits in the middle of the area
+    // left free by a phone sheet. Picking and overlays use the same matrix, so they follow.
+    {
+      const s = shift.current,
+        vi = viewInset.current,
+        { width: w, height: h } = state.size;
+      const k = L.reducedMotion ? 1 : Math.min(1, dt * 6);
+      const ease = (cur: number, want: number) => (Math.abs(want - cur) < 0.5 ? want : cur + (want - cur) * k);
+      s.x = ease(s.x, vi.right / 2);
+      s.y = ease(s.y, (vi.bottom - vi.top) / 2);
+      if (s.x !== s.ax || s.y !== s.ay || s.w !== w || s.h !== h) {
+        if (Math.abs(s.x) < 0.5 && Math.abs(s.y) < 0.5) cam.clearViewOffset();
+        else cam.setViewOffset(w, h, s.x, s.y, w, h);
+        Object.assign(s, { ax: s.x, ay: s.y, w, h });
+      }
+    }
 
     const tw = tween.current;
     if (tw) {
