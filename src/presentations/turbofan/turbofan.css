@@ -1,0 +1,130 @@
+/* Turbofan HUD: cockpit-style N1 / EGT dials + station cells. Scoped by class names. */
+.tf-dials {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  position: relative;
+}
+.dial {
+  width: 86px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.dial svg {
+  width: 86px;
+  height: 66px;
+  overflow: visible;
+}
+.dial .arc {
+  fill: none;
+  stroke: #e8eaec;
+  stroke-width: 1.1;
+}
+.dial .fillarc {
+  fill: none;
+  stroke: rgba(232, 234, 236, 0.18);
+  stroke-width: 7;
+}
+.dial .limit {
+  stroke: #e0402f;
+  stroke-width: 1.8;
+}
+.dial .needle {
+  stroke: #fff;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.dial .bug {
+  fill: #3fd17f;
+}
+.dial .read {
+  margin-top: -22px;
+  font-family: var(--f-mono);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid #c9ccd0;
+  border-radius: 2px;
+  padding: 1px 5px;
+  background: rgba(10, 12, 14, 0.75);
+  min-width: 52px;
+  text-align: right;
+}
+.dial.warn .read {
+  color: #ff5a46;
+  border-color: #ff5a46;
+}
+.tf-dials .rev {
+  position: absolute;
+  left: 18px;
+  top: -14px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: #e0b23a;
+  border: 1px solid #e0b23a;
+  padding: 0 4px;
+  border-radius: 2px;
+}
+.tf-dials .rev.on {
+  color: #3fd17f;
+  border-color: #3fd17f;
+}
+.tf-st .cell {
+  width: 76px;
+}
+.tf-st .cell b small {
+  font-size: 9.5px;
+  font-weight: 400;
+  margin-left: 2px;
+}
+.tf-st .cell em {
+  display: block;
+  font-style: normal;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.tf-st .cell i {
+  display: none;
+}
+.tf-st .cell::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--c);
+}
+@media (max-width: 1180px) {
+  .tf-st .cell b small {
+    display: none;
+  }
+  .tf-st .cell {
+    width: 62px;
+  }
+}
+@media (max-width: 640px) {
+  .tf-dials {
+    display: none;
+  }
+  .tf-st .cells {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .tf-st {
+    width: 100%;
+  }
+  .tf-st .cell {
+    width: auto;
+    min-width: 0;
+  }
+  .tf-st .cell span {
+    font-size: 9px;
+  }
+  .tf-st .cell em {
+    display: none;
+  }
+}
