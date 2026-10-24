@@ -28,6 +28,17 @@ export const PRESENTATIONS: PresentationMeta[] = [
     load: () => import('./sandero-d4f'),
   },
   {
+    slug: 'turbofan',
+    title: 'Turbofan CFM56',
+    eyebrow: 'Boeing 737 · CFM56-7B · 2 arbori · bypass 5:1',
+    summary: 'Motor de avion secționat: ventilator, compresoare, cameră de ardere, turbine și aerul care trece prin ele.',
+    intro:
+      'Motorul unui Boeing 737, secționat. Mișcă maneta și urmărește cum accelerează cei doi rotori, cum se încălzește aerul și cum se deschide inversorul. Trage ca să rotești, apasă pe un punct.',
+    thumbnail: '/thumbnails/turbofan.jpg',
+    tags: ['Motor de avion', 'Turbomașini', 'Termodinamică'],
+    load: () => import('./turbofan'),
+  },
+  {
     slug: 'ferrari-v8',
     title: 'Ferrari V8 F154',
     eyebrow: 'V8 la 90° · 3,9 L · twin-turbo · arbore flat-plane',
