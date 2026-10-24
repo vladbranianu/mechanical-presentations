@@ -2,11 +2,11 @@
  * Full-screen presentation viewer: 3D stage, title block, hotspots, part panel and the bottom
  * bar (presentation telemetry + presentation controls + shared controls).
  */
-import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ComponentType, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
-import { SceneRuntime, type CameraApi, type LiveState, type OverlayRefs } from './SceneRuntime';
+import { SceneRuntime, type CameraApi, type LiveState, type OverlayRefs, type ViewInset } from './SceneRuntime';
 import type { HudProps, PresentationInstance, PresentationMeta, PresentationModule } from './types';
 import { Btn, Range, useReducedMotion, useTicker } from './ui';
 import { detectQuality, dprRange } from './quality';
@@ -29,6 +29,11 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
   const [explode, setExplode] = useState(0);
   const [playing, setPlaying] = useState(!reducedMotion);
   const [labels, setLabels] = useState(!capture);
+  /** Phone bottom sheet: body + specs shown. Kept while stepping through parts. */
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [panelEl, setPanelEl] = useState<HTMLElement | null>(null);
+  const brandRef = useRef<HTMLElement | null>(null);
+  const viewInset = useRef<ViewInset>({ top: 0, bottom: 0, right: 0 });
 
   const live = useRef<LiveState<P>>({
     params,
@@ -78,6 +83,32 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
       cameraApi.current?.setView(part.view);
     } else cameraApi.current?.setView(instance.homeView, { home: true });
   }, [instance, selected]);
+
+  // On phones the part panel is a sheet glued to the bottom (portrait) or right edge (landscape).
+  // Tell the camera which part of the screen is still free so the selected part is framed there
+  // instead of behind the sheet. The floating desktop card is left alone.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const r = panelEl?.getBoundingClientRect();
+      const W = innerWidth,
+        H = innerHeight;
+      const inset = { top: 0, bottom: 0, right: 0 };
+      if (r && r.width >= W - 1 && r.bottom >= H - 1) {
+        inset.top = brandRef.current?.getBoundingClientRect().bottom ?? 0;
+        inset.bottom = H - r.top;
+      } else if (r && r.height >= H - 1 && r.right >= W - 1) inset.right = W - r.left;
+      viewInset.current = inset;
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (panelEl) ro.observe(panelEl);
+    if (brandRef.current) ro.observe(brandRef.current);
+    addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      removeEventListener('resize', measure);
+    };
+  }, [panelEl]);
 
   const goHome = useCallback(() => setSelected(null), []);
   const onPick = useCallback((id: string) => setSelected(id), []);
@@ -139,6 +170,7 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
           module={module}
           live={live}
           overlays={overlays}
+          viewInset={viewInset}
           cameraApi={cameraApi}
           onReady={onReady}
           onPick={onPick}
@@ -154,11 +186,14 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
   const hudProps = instance ? { instance, params, setParams, reducedMotion } : null;
 
   return (
-    <div className={'viewer' + (capture ? ' capture' : '')} style={{ background: sc.background }}>
+    <div
+      className={'viewer' + (capture ? ' capture' : '') + (selected ? ' sel' : '')}
+      style={{ background: sc.background }}
+    >
       <div className="stage">{canvas}</div>
       {!capture && (
         <>
-          <header className="brand">
+          <header className="brand" ref={brandRef}>
             <Link className="back" to="/">
               ← Toate prezentările
             </Link>
@@ -196,7 +231,17 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
             ))}
           </div>
 
-          {instance && selected && <PartPanel instance={instance} id={selected} onStep={step} onClose={goHome} />}
+          {instance && selected && (
+            <PartPanel
+              ref={setPanelEl}
+              instance={instance}
+              id={selected}
+              open={sheetOpen}
+              onToggle={() => setSheetOpen((o) => !o)}
+              onStep={step}
+              onClose={goHome}
+            />
+          )}
 
           <footer className="hud">
             {Hud && hudProps && <TickingHud Hud={Hud} props={hudProps} />}
@@ -258,14 +303,24 @@ function TickingHud<P>({
   return <Hud {...props} />;
 }
 
+/**
+ * Part details. Desktop: card on the right. Phones: bottom sheet that starts collapsed (name, lead,
+ * navigation) and expands to body + specs, capped so the model stays visible above it.
+ */
 function PartPanel<P>({
+  ref,
   instance,
   id,
+  open,
+  onToggle,
   onStep,
   onClose,
 }: {
+  ref: (el: HTMLElement | null) => void;
   instance: PresentationInstance<P>;
   id: string;
+  open: boolean;
+  onToggle: () => void;
   onStep: (d: number) => void;
   onClose: () => void;
 }) {
@@ -273,7 +328,11 @@ function PartPanel<P>({
   const d = instance.parts.find((p) => p.id === id);
   if (!d) return null;
   return (
-    <aside className="panel" aria-live="polite">
+    <aside ref={ref} className={'panel' + (open ? ' open' : '')} aria-live="polite">
+      <button type="button" className="sheet-toggle" aria-expanded={open} onClick={onToggle}>
+        <span className="grip" aria-hidden="true" />
+        {open ? 'Mai puțin' : 'Detalii și date tehnice'}
+      </button>
       <div className="eyebrow">{d.group}</div>
       <h2>{d.name}</h2>
       <p className="lead">{d.lead}</p>

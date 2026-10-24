@@ -352,6 +352,9 @@ a {
 .panel .eyebrow {
   color: var(--muted);
 }
+.sheet-toggle {
+  display: none;
+}
 .panel h2 {
   font-family: var(--f-display);
   font-weight: 800;
@@ -476,6 +479,95 @@ a {
 .cell.fire {
   box-shadow: inset 0 0 18px rgba(255, 122, 46, 0.35);
 }
+.cell b small {
+  font-size: 9.5px;
+  font-weight: 400;
+}
+.cell em {
+  display: block;
+  font-style: normal;
+  font-family: var(--f-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.bank.dense .cell {
+  width: 76px;
+}
+
+/* Round gauges (e.g. turbofan N1 / EGT). */
+.gauges {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  position: relative;
+}
+.dial {
+  width: 86px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.dial svg {
+  width: 86px;
+  height: 66px;
+  overflow: visible;
+}
+.dial .arc {
+  fill: none;
+  stroke: #e8eaec;
+  stroke-width: 1.1;
+}
+.dial .fillarc {
+  fill: none;
+  stroke: rgba(232, 234, 236, 0.18);
+  stroke-width: 7;
+}
+.dial .limit {
+  stroke: #e0402f;
+  stroke-width: 1.8;
+}
+.dial .needle {
+  stroke: #fff;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.dial .bug {
+  fill: #3fd17f;
+}
+.dial .read {
+  margin-top: -22px;
+  font-family: var(--f-mono);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid #c9ccd0;
+  border-radius: 2px;
+  padding: 1px 5px;
+  background: rgba(10, 12, 14, 0.75);
+  min-width: 52px;
+  text-align: right;
+}
+.dial.warn .read {
+  color: #ff5a46;
+  border-color: #ff5a46;
+}
+.gauges .flag {
+  position: absolute;
+  left: 18px;
+  top: -14px;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: #e0b23a;
+  border: 1px solid #e0b23a;
+  padding: 0 4px;
+  border-radius: 2px;
+}
+.gauges .flag.on {
+  color: #3fd17f;
+  border-color: #3fd17f;
+}
 .stats {
   display: grid;
   grid-template-columns: repeat(4, auto);
@@ -552,6 +644,14 @@ input:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+@media (max-width: 1180px) {
+  .cell b small {
+    display: none;
+  }
+  .bank.dense .cell {
+    width: 62px;
+  }
+}
 @media (max-width: 860px) {
   .stats {
     grid-template-columns: repeat(2, auto);
@@ -585,12 +685,10 @@ input:focus-visible {
   }
   .cells {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(var(--phone-cols, 3), 1fr);
   }
-  .cells[data-n='4'] {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .cell {
+  .cell,
+  .bank.dense .cell {
     width: auto;
     min-width: 0;
     padding: 4px 5px 7px;
@@ -600,7 +698,11 @@ input:focus-visible {
     overflow: hidden;
     text-overflow: clip;
   }
+  .cell em {
+    display: none;
+  }
   .stats,
+  .gauges,
   .hide-sm {
     display: none;
   }
@@ -616,20 +718,132 @@ input:focus-visible {
   input[type='range'] {
     width: 100%;
   }
+  .hud > .bank {
+    width: 100%;
+  }
+  /* Selected part: the title block shrinks to the back link, the model gets the room. */
+  .viewer.sel .brand .eyebrow,
+  .viewer.sel .brand h1,
+  .viewer.sel .hud {
+    display: none;
+  }
+  /* Part panel = bottom sheet: collapsed shows name + lead + navigation, expanded adds the details. */
   .panel {
     left: 0;
     right: 0;
     top: auto;
     bottom: 0;
     width: auto;
-    max-height: 60%;
-    border-radius: 10px 10px 0 0;
-    padding-block: 18px calc(16px + env(safe-area-inset-bottom, 0px));
+    max-height: 32%;
+    border-radius: 12px 12px 0 0;
+    border-bottom: 0;
+    gap: 8px;
+    padding-block: 0;
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: rgba(20, 25, 30, 0.94);
+  }
+  .panel.open {
+    max-height: 50%;
+  }
+  .panel:not(.open) .body,
+  .panel:not(.open) .specs {
+    display: none;
+  }
+  .sheet-toggle {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+    padding: 8px 0 6px;
+    background: rgba(20, 25, 30, 0.97);
+    border: 0;
+    color: var(--muted);
+    font-family: var(--f-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .sheet-toggle .grip {
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--line);
+  }
+  .sheet-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
   .panel h2 {
+    font-size: 26px;
+  }
+  .panel .lead {
+    font-size: 14px;
+  }
+  .pnav {
+    position: sticky;
+    bottom: 0;
+    padding-block: 6px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: rgba(20, 25, 30, 0.97);
+  }
+  .pnav .btn {
+    padding: 7px 8px;
+  }
+}
+/* Phones in landscape: little height, so telemetry goes, controls stay, the part panel becomes a
+   full-height sheet on the right and the model is framed in the space left of it. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .brand h1 {
     font-size: 30px;
+  }
+  .brand p,
+  .brand .key,
+  .viewer.sel .brand .eyebrow,
+  .viewer.sel .brand h1,
+  .viewer.sel .hud,
+  .hud .banks,
+  .hud > .bank,
+  .gauges,
+  .stats,
+  .hide-sm {
+    display: none;
+  }
+  .hud {
+    padding-block: 24px calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+  .controls {
+    margin-left: 0;
+  }
+  .panel {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(380px, 46%);
+    max-height: none;
+    border-radius: 12px 0 0 12px;
+    border-right: 0;
+    gap: 8px;
+    padding-block: calc(env(safe-area-inset-top, 0px) + 14px) 0;
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: rgba(20, 25, 30, 0.94);
+  }
+  .panel h2 {
+    font-size: 26px;
+  }
+  .panel .lead {
+    font-size: 14px;
+  }
+  .pnav {
+    position: sticky;
+    bottom: 0;
+    margin-top: auto;
+    padding-block: 6px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: rgba(20, 25, 30, 0.97);
   }
 }
 @media (prefers-reduced-motion: reduce) {

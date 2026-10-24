@@ -46,7 +46,7 @@ three.js și codul scenei se descarcă doar când deschizi o prezentare; pagina 
    - `build(ctx)`: construiește scena (geometrie procedurală sau un glTF încărcat) și
      întoarce `root`, `parts` (textul fiecărei piese, cadrul de cameră, ancora hotspot-ului),
      `pickables`, `modes`, `update()` pe frame și `dispose()`.
-   - opțional `Hud` / `Controls`: componente React pentru bara de jos.
+   - opțional `Hud` / `Controls`: componente React pentru bara de jos, compuse **doar** din blocurile din `src/framework/hud.tsx` (`CellGroup`, `Stats`, `Gauge`, `ControlGroup`...). Prezentarea dă datele; aspectul și comportamentul pe telefon sunt în framework + `styles.css`, deci o schimbare de design se aplică tuturor.
 2. Adaugă intrarea în `src/presentations/catalog.ts`.
 3. Generează thumbnail-ul: `npm run build && npm run preview`, apoi în alt terminal
    `npm run thumbnails -- <slug>` (cere un Chromium pentru Playwright:
