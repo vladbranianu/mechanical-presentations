@@ -17,6 +17,17 @@ export const PRESENTATIONS: PresentationMeta[] = [
     load: () => import('./flat-six'),
   },
   {
+    slug: 'sandero-12',
+    title: 'Sandero 1.2 16V',
+    eyebrow: '4 în linie · 1,2 L 16V · 75 CP',
+    summary: 'Motorul Renault D4F din Dacia Sandero 2009: un singur ax cu came, culbutori în furcă și curea de distribuție.',
+    intro:
+      'Motorul Renault D4F de 1,2 L din Dacia Sandero 2009, secționat. Un singur ax cu came mișcă 16 supape prin culbutori, iar cureaua dințată antrenează și pompa de apă. Trage ca să rotești, apasă pe un punct.',
+    thumbnail: '/thumbnails/sandero-12.jpg',
+    tags: ['Motor', 'Distribuție', '4 cilindri'],
+    load: () => import('./sandero-d4f'),
+  },
+  {
     slug: 'ferrari-v8',
     title: 'Ferrari V8 F154',
     eyebrow: 'V8 la 90° · 3,9 L · twin-turbo · arbore flat-plane',
