@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { SceneRuntime, type CameraApi, type LiveState, type OverlayRefs, type ViewInset } from './SceneRuntime';
 import type { HudProps, PresentationInstance, PresentationMeta, PresentationModule } from './types';
 import { Btn, Range, useReducedMotion, useTicker } from './ui';
+import { ControlGroup } from './hud';
 import { detectQuality, dprRange } from './quality';
 import { useEngineSound } from './audio/useEngineSound';
 
@@ -26,6 +27,10 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
   const [params, setParamsState] = useState<P>(module.initialParams);
   const [mode, setMode] = useState<string>('');
   const [selected, setSelected] = useState<string | null>(null);
+  /** Active functional system (presentations that declare systems); null = all. */
+  const [system, setSystem] = useState<string | null>(null);
+  const systemRef = useRef(system);
+  systemRef.current = system;
   const [explode, setExplode] = useState(0);
   const [playing, setPlaying] = useState(!reducedMotion);
   const [labels, setLabels] = useState(!capture);
@@ -64,6 +69,23 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
     if (instance && mode) instance.setMode(mode);
   }, [instance, mode]);
 
+  const revealInternals = useCallback(
+    (i: PresentationInstance<P>) => {
+      const cur = i.modes.find((m) => m.id === mode);
+      if (cur && !cur.revealsInternals) {
+        const reveal = i.modes.find((m) => m.revealsInternals);
+        if (reveal) setMode(reveal.id);
+      }
+    },
+    [mode],
+  );
+  /** Overview of the active system, or of the whole model. */
+  const flyOverview = useCallback((i: PresentationInstance<P>) => {
+    const sys = i.systems?.find((s) => s.id === systemRef.current);
+    if (sys) cameraApi.current?.setView(sys.view);
+    else cameraApi.current?.setView(i.homeView, { home: true });
+  }, []);
+
   // Selection → highlight + camera.
   const firstSel = useRef(true);
   useEffect(() => {
@@ -75,14 +97,25 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
     }
     const part = instance.parts.find((p) => p.id === selected);
     if (part) {
-      const cur = instance.modes.find((m) => m.id === mode);
-      if (part.internal && cur && !cur.revealsInternals) {
-        const reveal = instance.modes.find((m) => m.revealsInternals);
-        if (reveal) setMode(reveal.id);
-      }
+      if (part.internal) revealInternals(instance);
+      // picking a part focuses its system (others fade, its hotspots appear)
+      if (part.system && part.system !== systemRef.current) setSystem(part.system);
       cameraApi.current?.setView(part.view);
-    } else cameraApi.current?.setView(instance.homeView, { home: true });
+    } else flyOverview(instance);
   }, [instance, selected]);
+
+  // System → scene filter + camera (a selected part keeps its own framing).
+  const firstSys = useRef(true);
+  useEffect(() => {
+    if (!instance?.systems) return;
+    instance.setSystem?.(system);
+    if (firstSys.current) {
+      firstSys.current = false;
+      return;
+    }
+    if (system) revealInternals(instance);
+    if (!selected) flyOverview(instance);
+  }, [instance, system]);
 
   // On phones the part panel is a sheet glued to the bottom (portrait) or right edge (landscape).
   // Tell the camera which part of the screen is still free so the selected part is framed there
@@ -142,7 +175,12 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
 
   const { scene: sc } = module;
   const modeDef = instance?.modes.find((m) => m.id === mode);
-  const order = instance?.parts ?? [];
+  const systems = instance?.systems;
+  const sysDef = systems?.find((s) => s.id === system);
+  const order = (instance?.parts ?? []).filter((p) => !sysDef || p.system === sysDef.id);
+  /** Hotspots on screen: one per system while none is active, else the active system's parts. */
+  const shown = (p: { id: string; system?: string }) =>
+    !systems ? true : sysDef ? p.system === sysDef.id : systems.some((s) => s.part === p.id) || p.id === selected;
   const selIdx = order.findIndex((p) => p.id === selected);
   const step = (d: number) => setSelected(order[(selIdx + d + order.length) % order.length].id);
 
@@ -200,6 +238,12 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
             <div className="eyebrow">{meta.eyebrow}</div>
             <h1>{meta.title}</h1>
             <p>{meta.intro}</p>
+            {sysDef && (
+              <div className="key">
+                <i style={{ background: sysDef.color }} />
+                {sysDef.lead}
+              </div>
+            )}
             {modeDef?.showsSection && (
               <div className="key">
                 <i />
@@ -216,9 +260,10 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
             ))}
           </div>
           <div className="overlay" hidden={!labels}>
-            {order.map((p) => (
+            {(instance?.parts ?? []).map((p) => (
               <button
                 key={p.id}
+                hidden={!shown(p)}
                 type="button"
                 className={'hs' + (selected ? (selected === p.id ? ' on' : ' dim') : '')}
                 aria-label={p.name}
@@ -246,6 +291,29 @@ export function Viewer<P>({ meta, module, capture = false }: Props<P>) {
           <footer className="hud">
             {Hud && hudProps && <TickingHud Hud={Hud} props={hudProps} />}
             <div className="controls">
+              {systems && (
+                <ControlGroup
+                  wide
+                  caption="Sisteme"
+                  rows={[
+                    {
+                      label: 'Sisteme',
+                      buttons: [
+                        { label: 'Toate', pressed: !system, onClick: () => setSystem(null) },
+                        ...systems.map((s) => ({
+                          label: s.label,
+                          swatch: s.color,
+                          pressed: s.id === system,
+                          onClick: () => {
+                            setSelected(null);
+                            setSystem(s.id === system ? null : s.id);
+                          },
+                        })),
+                      ],
+                    },
+                  ]}
+                />
+              )}
               {Controls && hudProps && <Controls {...hudProps} />}
               <div className="ctl">
                 <Range

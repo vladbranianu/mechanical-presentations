@@ -26,6 +26,24 @@ export interface PartInfo {
   anchor: (out: Vector3) => Vector3;
   /** Hidden inside the housing: selecting it switches a "solid" mode back to the section mode. */
   internal?: boolean;
+  /** SystemDef.id this part belongs to (presentations that declare systems). */
+  system?: string;
+}
+
+/**
+ * A functional system of a whole machine (cooling, exhaust...). The viewer shows a standard
+ * selector; choosing one fades the others out, keeps only its hotspots and frames it.
+ */
+export interface SystemDef {
+  id: string;
+  label: string;
+  /** Legend colour (pipes / particles of this system use it too). */
+  color: string;
+  /** One line shown under the title while the system is active. */
+  lead: string;
+  view: CameraView;
+  /** The part whose hotspot stands for the system while no system is active. */
+  part: string;
 }
 
 export interface ViewMode {
@@ -79,6 +97,9 @@ export interface PresentationInstance<P> {
   /** Reject hits that land on geometry currently cut away (section mode). */
   acceptHit?(hit: Intersection, mode: string): boolean;
   tags?: OverlayTag[];
+  /** Functional systems; the viewer adds the selector and calls setSystem (null = all). */
+  systems?: SystemDef[];
+  setSystem?(id: string | null): void;
   update(input: FrameInput<P>): void;
   dispose(): void;
 }
