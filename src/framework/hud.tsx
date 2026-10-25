@@ -156,6 +156,8 @@ export interface ButtonData {
   title?: string;
   /** false = hidden on phones. */
   phone?: boolean;
+  /** Small colour square before the label (system legend). */
+  swatch?: string;
 }
 
 export interface RangeData {
@@ -175,15 +177,18 @@ export function ControlGroup({
   range,
   rows = [],
   wide,
+  phone,
 }: {
   caption?: string;
   range?: RangeData;
   rows?: { buttons: ButtonData[]; phone?: boolean; label?: string }[];
   /** Spans the full width on phones. */
   wide?: boolean;
+  /** false = the whole block is hidden on phones. */
+  phone?: boolean;
 }) {
   return (
-    <div className={'ctl' + (wide ? ' wide' : '')}>
+    <div className={'ctl' + (wide ? ' wide' : '') + (phone === false ? ' hide-sm' : '')}>
       {caption && <span className="cap">{caption}</span>}
       {range && <Range {...range} />}
       {rows.map((r, i) => (
@@ -196,6 +201,7 @@ export function ControlGroup({
               className={b.phone === false ? 'hide-sm' : undefined}
               onClick={b.onClick}
             >
+              {b.swatch && <i className="swatch" style={{ background: b.swatch }} />}
               {b.label}
             </Btn>
           ))}

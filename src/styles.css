@@ -625,6 +625,14 @@ input[type='range'] {
   padding: 7px 10px;
   cursor: pointer;
 }
+.btn .swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: 0;
+}
 .btn:hover {
   border-color: var(--muted);
 }

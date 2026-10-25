@@ -49,6 +49,17 @@ export const PRESENTATIONS: PresentationMeta[] = [
     tags: ['Motor', 'Turbo', 'Arbore cotit'],
     load: () => import('./ferrari-v8'),
   },
+  {
+    slug: 'mercedes-e',
+    title: 'Mercedes E-Class',
+    eyebrow: 'W214 · E 200 · 2.0 turbo 48 V · 9G-TRONIC',
+    summary: 'Mașina întreagă cu caroseria transparentă: motor, admisie, răcire, lubrifiere, transmisie, aerisire și evacuare.',
+    intro:
+      'Un Mercedes E 200 (W214) cu caroseria pe X-ray. Alege un sistem din bara de jos ca să-l vezi singur, cu lichidele și aerul care circulă prin el. Trage ca să rotești, apasă pe un punct.',
+    thumbnail: '/thumbnails/mercedes-e.jpg',
+    tags: ['Mașină întreagă', 'Sisteme', 'Fluide'],
+    load: () => import('./mercedes-e'),
+  },
 ];
 
 export const findPresentation = (slug: string | undefined) => PRESENTATIONS.find((p) => p.slug === slug);
